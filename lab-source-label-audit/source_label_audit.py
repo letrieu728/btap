@@ -131,11 +131,15 @@ def score(paths):
     with key_path.open(newline='', encoding='utf-8') as f:
         key = {r['audit_id']: r for r in csv.DictReader(f)}
     r1, r2 = map(read_ratings, paths)
-    kappa, n_agree = cohen_kappa(r1, r2)
+    kappa, n_paired = cohen_kappa(r1, r2)
+    paired = [(r1[k], r2[k]) for k in r1.keys() & r2.keys() if r1[k] != 9 and r2[k] != 9]
+    exact_agreement = sum(a == b for a, b in paired)
+    binary_paired = [(binary(a), binary(b)) for a, b in paired]
+    binary_agreement = sum(a == b for a, b in binary_paired)
     consensus = {}
     for audit_id in key:
         a, b = r1.get(audit_id), r2.get(audit_id)
-        if a is not None and b is not None and a == b and binary(a) is not None:
+        if a is not None and b is not None and binary(a) is not None and binary(a) == binary(b):
             consensus[audit_id] = binary(a)
     tp = fp = fn = tn = 0
     for audit_id, manual in consensus.items():
@@ -146,7 +150,8 @@ def score(paths):
         else: tn += 1
     precision = tp / (tp + fp) if tp + fp else float('nan')
     recall = tp / (tp + fn) if tp + fn else float('nan')
-    print(json.dumps(dict(rater_1_completed=len(r1), rater_2_completed=len(r2), exact_agreement_n=n_agree,
+    print(json.dumps(dict(rater_1_completed=len(r1), rater_2_completed=len(r2), paired_n=n_paired,
+                          exact_agreement_n=exact_agreement, binary_agreement_n=binary_agreement,
                           cohen_kappa=round(kappa, 3), consensus_n=len(consensus), confusion_matrix=dict(tp=tp, fp=fp, fn=fn, tn=tn),
                           regex_precision=round(precision, 3), regex_recall=round(recall, 3)), indent=2))
 
